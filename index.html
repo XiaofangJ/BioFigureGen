@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JiangLab_BioFigureGen — multi-panel figure workbench</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">f</div>
+        <span>JiangLab_BioFigureGen</span>
+        <span class="brand-sub">multi-panel figure workbench</span>
+      </div>
+      <nav class="crumbs" id="crumbs"></nav>
+      <div class="topbar-actions">
+        <button class="btn ghost" id="save-config-btn" title="Download current panel's settings as JSON">
+          <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M4 6l4 4 4-4M3 13h10"/></svg>
+          Save config
+        </button>
+        <button class="btn ghost" id="load-config-btn" title="Load settings from a JSON file">
+          <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 10V2M4 6l4-4 4 4M3 13h10"/></svg>
+          Load config
+        </button>
+        <button class="btn ghost" id="topbar-help" title="Keyboard shortcuts">
+          <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M6 6c0-1.1 1-2 2-2s2 .9 2 2-2 1.5-2 3"/><circle cx="8" cy="11.5" r="0.6" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Left rail -->
+    <aside class="rail">
+      <div class="rail-section">Instruments</div>
+      <div class="rail-list" id="rail-list"></div>
+      <div class="rail-footer">
+        <div style="color:#1a1a1a;font-weight:500;margin-bottom:4px;">Drop a file anywhere</div>
+        Open data&nbsp;<kbd>⌘O</kbd><br>
+        Save SVG&nbsp;<kbd>⌘S</kbd><br>
+        Save PDF&nbsp;<kbd>⌘P</kbd>
+      </div>
+    </aside>
+
+    <!-- Center stage -->
+    <main class="stage" id="stage"></main>
+
+    <!-- Right inspector -->
+    <aside class="inspector" id="inspector"></aside>
+  </div>
+
+  <!-- Drop overlay -->
+  <div class="drop-overlay" id="drop-overlay">
+    <div class="drop-overlay-inner">
+      <div class="big">↓</div>
+      <div>Drop ITC data file</div>
+      <div class="small">Tab-separated .txt from your calorimeter</div>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
+  <input type="file" id="file-input" class="hidden" accept=".txt,.tsv,.csv,.dat,.mgf,.mzml,.mzML,.xml" />
+
+  <!-- Splash thumbnail for standalone export -->
+  <template id="__bundler_thumbnail" data-bg-color="#f4f4f2">
+    <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      <rect x="200" y="180" width="800" height="180" fill="#ffffff" stroke="#1a1a1a" stroke-width="3"/>
+      <rect x="200" y="380" width="800" height="240" fill="#ffffff" stroke="#1a1a1a" stroke-width="3"/>
+      <path d="M220 320 q40 -100 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+      <path d="M220 600 q200 -160 400 -100 t360 -30" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+      <g fill="#1a1a1a">
+        <circle cx="260" cy="600" r="8"/>
+        <circle cx="340" cy="590" r="8"/>
+        <circle cx="420" cy="570" r="8"/>
+        <circle cx="500" cy="535" r="8"/>
+        <circle cx="580" cy="490" r="8"/>
+        <circle cx="660" cy="465" r="8"/>
+        <circle cx="740" cy="455" r="8"/>
+        <circle cx="820" cy="450" r="8"/>
+      </g>
+      <text x="600" y="90" font-family="Times New Roman, serif" font-size="56" font-style="italic" text-anchor="middle" fill="#1a1a1a">JiangLab_BioFigureGen</text>
+      <text x="600" y="140" font-family="Times New Roman, serif" font-size="26" text-anchor="middle" fill="#555">publication-quality figures from raw data</text>
+    </svg>
+  </template>
+
+  <script src="itc.js"></script>
+  <script src="lcms.js"></script>
+  <script src="xicstack.js"></script>
+  <script src="gcms.js"></script>
+  <script src="mm.js"></script>
+  <script src="cd.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
