@@ -458,15 +458,41 @@
     } else {
       chrom = data.chromatogram;
     }
+    // Overlay traces: in XIC mode, extra m/z values (comma/space separated in
+    // opts.xicMzExtra) are extracted with the same tolerance and drawn on the
+    // same chromatogram axes, each in its own color with a legend.
+    const xicTraces = [];
+    const xicMzPrimary = parseFloat(xicMz);
+    const xicTolValue = xicTolMode === 'ppm' ? xicPpm : xicTol;
+    if (chromMode === 'xic' && chrom && data.spectra.length > 1 && !isNaN(xicMzPrimary) && xicMzPrimary > 0) {
+      xicTraces.push({ mz: xicMzPrimary, rt: chrom.rt, intensity: chrom.intensity });
+      parseMzList(opts.xicMzExtra).forEach(mz => {
+        const c = buildChromatogram(data.spectra, 'xic', mz, xicTolValue, xicTolMode);
+        if (c) xicTraces.push({ mz, rt: c.rt, intensity: c.intensity });
+      });
+      xicTraces.forEach((t, i) => { t.color = XIC_PALETTE[i % XIC_PALETTE.length]; });
+    }
+    const multiXic = xicTraces.length > 1;
+    const xicNormalizeEach = multiXic && (opts.xicNormalizeEach ?? false);
     // Apply RT view window if set
-    if (chrom && rtViewMin != null && rtViewMax != null && rtViewMax > rtViewMin) {
+    function clipRT(c) {
       const rt = [], intensity = [];
-      for (let i = 0; i < chrom.rt.length; i++) {
-        if (chrom.rt[i] >= rtViewMin && chrom.rt[i] <= rtViewMax) {
-          rt.push(chrom.rt[i]); intensity.push(chrom.intensity[i]);
+      for (let i = 0; i < c.rt.length; i++) {
+        if (c.rt[i] >= rtViewMin && c.rt[i] <= rtViewMax) {
+          rt.push(c.rt[i]); intensity.push(c.intensity[i]);
         }
       }
-      if (rt.length >= 2) chrom = { rt, intensity };
+      return rt.length >= 2 ? { rt, intensity } : c;
+    }
+    if (chrom && rtViewMin != null && rtViewMax != null && rtViewMax > rtViewMin) {
+      chrom = clipRT(chrom);
+      xicTraces.forEach(t => { const c = clipRT(t); t.rt = c.rt; t.intensity = c.intensity; });
+    }
+    if (xicNormalizeEach) {
+      xicTraces.forEach(t => {
+        const m = Math.max(...t.intensity, 0);
+        t.intensity = t.intensity.map(v => m > 0 ? v / m * 100 : 0);
+      });
     }
     const showChrom = (opts.showChrom ?? true) && chrom && chrom.rt.length > 0;
     const fontFamily = opts.fontFamily || "Arial, 'Helvetica Neue', Helvetica, sans-serif";
@@ -554,8 +580,9 @@
     // ----- Chromatogram -----
     if (showChrom && topH > 0) {
       const c = chrom;
+      const traces = multiXic ? xicTraces : [{ rt: c.rt, intensity: c.intensity, color: '#000' }];
       const xMin = c.rt[0], xMax = c.rt[c.rt.length - 1];
-      const yMax_ = Math.max(...c.intensity) * 1.05;
+      const yMax_ = xicNormalizeEach ? 105 : Math.max(...traces.map(t => Math.max(...t.intensity))) * 1.05;
       const yMin = 0;
       const xTicks = niceTicks(xMin, xMax, 6);
       // Use fewer ticks (3) on the chromatogram y-axis so the panel stays compact
@@ -565,16 +592,32 @@
       // factor ×10ⁿ is shown once above the axis (engineering-style).
       const yPeak = yTicks[yTicks.length - 1];
       let yExp = 0;
-      if (yPeak >= 1e3) yExp = Math.floor(Math.log10(yPeak));
+      if (yPeak >= 1e3 && !xicNormalizeEach) yExp = Math.floor(Math.log10(yPeak));
       const yScale = Math.pow(10, yExp);
       const yExpLabel = yExp >= 3 ? ('×10' + supDigits(yExp)) : '';
       function sxC(v) { return topX + (v - xMin) / (xMax - xMin) * plotW; }
       function syC(v) { return topY + topH - (v - yMin) / (yMax_ - yMin) * topH; }
-      let d = '';
-      for (let i = 0; i < c.rt.length; i++) {
-        d += (i === 0 ? 'M' : 'L') + sxC(c.rt[i]).toFixed(2) + ',' + syC(c.intensity[i]).toFixed(2) + ' ';
+      // Draw extra traces first so the primary m/z sits on top
+      for (let ti = traces.length - 1; ti >= 0; ti--) {
+        const t = traces[ti];
+        let d = '';
+        for (let i = 0; i < t.rt.length; i++) {
+          d += (i === 0 ? 'M' : 'L') + sxC(t.rt[i]).toFixed(2) + ',' + syC(t.intensity[i]).toFixed(2) + ' ';
+        }
+        parts.push(`<path d="${d}" fill="none" stroke="${t.color}" stroke-width="${lineWidth}" stroke-linejoin="round"/>`);
       }
-      parts.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="${lineWidth}" stroke-linejoin="round"/>`);
+      // Legend (top-right) when overlaying multiple m/z
+      if (multiXic) {
+        const rowH = tickSize + 4;
+        const lx = topX + plotW - 8;
+        traces.forEach((t, i) => {
+          const ly = topY + 10 + i * rowH;
+          const lbl = 'm/z ' + t.mz.toFixed(4);
+          const tw = lbl.length * tickSize * 0.55;
+          parts.push(`<line x1="${(lx - tw - 22).toFixed(2)}" y1="${(ly - tickSize * 0.35).toFixed(2)}" x2="${(lx - tw - 6).toFixed(2)}" y2="${(ly - tickSize * 0.35).toFixed(2)}" stroke="${t.color}" stroke-width="${Math.max(lineWidth, 1.5)}"/>`);
+          parts.push(`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" text-anchor="end" font-size="${tickSize}" fill="${t.color}"><tspan font-style="italic">m</tspan>/<tspan font-style="italic">z</tspan> ${t.mz.toFixed(4)}</text>`);
+        });
+      }
 
       // Active scan markers
       if (ms1Spec && ms1Spec.rt != null) {
@@ -591,7 +634,9 @@
         yMin, yMax: yTicks[yTicks.length-1] > yMax_ ? yTicks[yTicks.length-1] : yMax_,
         xTicks, yTicks, xStep: xTicks[1]-xTicks[0], yStep: yTicks[1]-yTicks[0],
         xLabel: opts.xlabChrom || 'Retention time (min)',
-        yLabel: chromLabel(chromMode, xicMz, opts.ylabChrom, xicTolMode, xicTolMode === 'ppm' ? xicPpm : xicTol),
+        yLabel: multiXic
+          ? ((xicNormalizeEach ? 'Rel. XIC int. (%)' : 'XIC intensity') + ' ' + tolLabel(xicTolMode, xicTolValue))
+          : chromLabel(chromMode, xicMz, opts.ylabChrom, xicTolMode, xicTolValue),
         labelSize, tickSize, tickDir, spineStyle, borderWidth,
         leftLabelOffset: margin.left - 28,
         exponentLabel: yExpLabel,
@@ -632,7 +677,9 @@
         xLabel: 'm/z', yLabel: intensityMode === 'relative' ? 'Rel. int. (%) — MS¹' : 'Intensity — MS¹',
         showPrecursorMarker: false,
         xRange: ms1Range,
-        xicMarker: (chromMode === 'xic' && xicMz != null) ? { mz: xicMz, color: annoStickColor, tol: xicTolMode === 'ppm' ? (xicMz * xicPpm / 1e6) : xicTol } : null
+        xicMarkers: multiXic
+          ? xicTraces.map(t => ({ mz: t.mz, color: t.color, tol: xicTolMode === 'ppm' ? (t.mz * xicPpm / 1e6) : xicTol }))
+          : ((chromMode === 'xic' && xicMz != null) ? [{ mz: xicMz, color: annoStickColor, tol: xicTolMode === 'ppm' ? (xicMz * xicPpm / 1e6) : xicTol }] : [])
       });
     } else if (!ms1Spec && showChrom) {
       if (midH > 0) drawEmptyPanel(parts, midX, midY, plotW, midH, 'No MS¹ scan at this RT', fontFamily, labelSize, borderWidth, spineStyle);
@@ -669,7 +716,7 @@
     const { spec, annotations, X, Y, W, H, stickColor, annoStickColor, stickWidth,
             annoFontSize, annoTopN, showAnnotations, intensityMode,
             labelSize, tickSize, tickDir, spineStyle, borderWidth, leftLabelOffset,
-            xLabel, yLabel, showPrecursorMarker, precursorColor, xRange, xicMarker } = c;
+            xLabel, yLabel, showPrecursorMarker, precursorColor, xRange, xicMarkers } = c;
     if (!spec || !spec.mz.length) {
       drawEmptyPanel(parts, X, Y, W, H, 'No peaks', "'Helvetica Neue', sans-serif", labelSize, borderWidth, spineStyle);
       return;
@@ -689,8 +736,9 @@
     function sx(v) { return X + (v - xMin) / (xMax - xMin) * W; }
     function sy(v) { return Y + H - renderInt(v) / yMax * H; }
 
-    // XIC marker — band ± tolerance + center line, drawn BEHIND sticks
-    if (xicMarker && xicMarker.mz >= xMin && xicMarker.mz <= xMax) {
+    // XIC markers — band ± tolerance + center line, drawn BEHIND sticks
+    (xicMarkers || []).forEach((xicMarker, mi) => {
+    if (xicMarker.mz >= xMin && xicMarker.mz <= xMax) {
       const xc = sx(xicMarker.mz);
       const xL = sx(xicMarker.mz - xicMarker.tol);
       const xR = sx(xicMarker.mz + xicMarker.tol);
@@ -699,8 +747,12 @@
       // Center line
       parts.push(`<line x1="${xc.toFixed(2)}" y1="${Y}" x2="${xc.toFixed(2)}" y2="${Y + H}" stroke="${xicMarker.color}" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>`);
       // Label at top
-      parts.push(`<text x="${xc.toFixed(2)}" y="${(Y + 12).toFixed(2)}" text-anchor="middle" font-size="${annoFontSize}" fill="${xicMarker.color}">XIC ${xicMarker.mz.toFixed(4)}</text>`);
+      // Keep the label inside the panel when the m/z sits near an edge
+      const halfW = ('XIC ' + xicMarker.mz.toFixed(4)).length * annoFontSize * 0.3;
+      const anchor = xc + halfW > X + W ? 'end' : (xc - halfW < X ? 'start' : 'middle');
+      parts.push(`<text x="${xc.toFixed(2)}" y="${(Y + 12 + mi * (annoFontSize + 2)).toFixed(2)}" text-anchor="${anchor}" font-size="${annoFontSize}" fill="${xicMarker.color}">XIC ${xicMarker.mz.toFixed(4)}</text>`);
     }
+    });
 
     inRange.forEach(p => {
       const x = sx(p.mz);
@@ -773,6 +825,17 @@
       leftLabelOffset,
       yTickFmt: (v, s) => intensityMode === 'relative' ? formatTick(v, s) : (Math.abs(v) >= 1e3 ? (v/1e3).toFixed(0) + 'k' : formatTick(v, s))
     });
+  }
+
+  const XIC_PALETTE = ['#000000', '#2563eb', '#d97706', '#059669', '#7c3aed', '#db2777'];
+
+  function parseMzList(str) {
+    if (str == null) return [];
+    return String(str).split(/[\s,;]+/).map(parseFloat).filter(v => !isNaN(v) && v > 0);
+  }
+
+  function tolLabel(tolMode, tolValue) {
+    return tolMode === 'ppm' ? '±' + (tolValue ?? 10).toFixed(0) + ' ppm' : '±' + (tolValue ?? 0.02).toFixed(3) + ' Da';
   }
 
   function chromLabel(mode, mz, fallback, tolMode, tolValue) {

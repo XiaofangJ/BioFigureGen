@@ -89,6 +89,8 @@
           xicTol: 0.02,
           xicTolMode: 'ppm',
           xicPpm: 10,
+          xicMzExtra: '',
+          xicNormalizeEach: false,
           ms1RangeMode: 'auto',
           ms1Min: 100,
           ms1Max: 1000,
@@ -1687,7 +1689,7 @@
           <select class="field-select" data-opt="chromMode">
             <option value="tic" ${o.chromMode==='tic'?'selected':''}>TIC — Total ion current</option>
             <option value="bpc" ${o.chromMode==='bpc'?'selected':''}>BPC — Base peak chromatogram</option>
-            <option value="xic" ${o.chromMode==='xic'?'selected':''}>XIC — Extracted ion (single m/z)</option>
+            <option value="xic" ${o.chromMode==='xic'?'selected':''}>XIC — Extracted ion (one or more m/z)</option>
           </select>
         </div>
         ${o.chromMode === 'xic' ? `
@@ -1710,6 +1712,14 @@
             ${o.xicTolMode === 'ppm'
               ? 'Window = m/z × ppm / 10⁶. At m/z ' + (parseFloat(o.xicMz)||0).toFixed(4) + ', ±' + o.xicPpm + ' ppm ≈ ±' + ((parseFloat(o.xicMz)||0) * o.xicPpm / 1e6).toFixed(5) + ' Da.'
               : 'Sums all peaks within ±' + o.xicTol + ' Da of the target m/z per scan.'}
+          </div>
+          <div class="field" style="margin-top:6px;">
+            <label class="field-label">Overlay m/z (optional)</label>
+            <input class="field-input" data-opt="xicMzExtra" placeholder="e.g. 297.221, 273.222" value="${escapeAttr(o.xicMzExtra ?? '')}"/>
+          </div>
+          ${toggleField('Normalize each trace to 100%', 'xicNormalizeEach', o.xicNormalizeEach)}
+          <div style="font-size:10.5px;color:#8a8a85;line-height:1.45;">
+            Extra m/z values (comma-separated) are drawn on the same EIC in different colors with a legend, using the same tolerance. Turn on normalization when one ion is much weaker than the other.
           </div>
           <button class="btn primary" id="jump-xic-apex" style="width:100%;justify-content:center;margin-top:6px;">
             🎯 Jump to XIC peak apex
