@@ -610,6 +610,8 @@
       if (multiXic) {
         const rowH = tickSize + 4;
         const lx = topX + plotW - 8;
+        const boxW = Math.max(...traces.map(t => ('m/z ' + t.mz.toFixed(4)).length)) * tickSize * 0.55 + 30;
+        parts.push(`<rect x="${(lx - boxW + 2).toFixed(2)}" y="${(topY + 2).toFixed(2)}" width="${boxW.toFixed(2)}" height="${(traces.length * rowH + 4).toFixed(2)}" fill="#ffffff" fill-opacity="0.85"/>`);
         traces.forEach((t, i) => {
           const ly = topY + 10 + i * rowH;
           const lbl = 'm/z ' + t.mz.toFixed(4);
@@ -842,7 +844,7 @@
     if (mode === 'tic') return 'TIC intensity';
     if (mode === 'bpc') return 'Base peak intensity';
     if (mode === 'xic') {
-      const m = mz != null ? mz.toFixed(4) : '?';
+      const m = isFinite(parseFloat(mz)) ? parseFloat(mz).toFixed(4) : '?';
       const tol = tolMode === 'ppm' ? '±' + (tolValue ?? 10).toFixed(0) + ' ppm' : '±' + (tolValue ?? 0.02).toFixed(3) + ' Da';
       return 'XIC ' + m + ' ' + tol;
     }
